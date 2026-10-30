@@ -1,14 +1,18 @@
-/**
- * For more details on how to configure Wrangler, refer to:
- * https://developers.cloudflare.com/workers/wrangler/configuration/
- */
+
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "chris-tv-story-connector-2",
-	"main": "src/index.ts",
-	"compatibility_date": "2026-07-02",
-	"compatibility_flags": ["nodejs_compat"],
-	"observability": {
-		"enabled": true,
-	},
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "chris-tv-story-connector-2",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "kv_namespaces": [
+    {
+      "binding": "CHRIS_STORY_STORAGE",
+      "id": "b6f166fab9944eee83beeb20f746afce"
+    }
+  ]
 }
+
