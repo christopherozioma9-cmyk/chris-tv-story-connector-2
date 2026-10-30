@@ -1,66 +1,113 @@
+
 import { McpServer } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp/server";
+import { env } from "cloudflare:workers";
 import { z } from "zod";
 
 function createServer() {
-	const server = new McpServer({
-		name: "Authless Calculator",
-		version: "1.0.0",
-	});
+  const server = new McpServer({
+    name: "CHRIS TV STORY CONNECTOR",
+    version: "1.0.0",
+  });
 
-	server.registerTool(
-		"add",
-		{ inputSchema: z.object({ a: z.number(), b: z.number() }) },
-		async ({ a, b }) => ({
-			content: [{ type: "text", text: String(a + b) }],
-		}),
-	);
+  // Save a story scene
+  server.registerTool(
+    "save_story_scene",
+    {
+      description: "Save a scene from a Nollywood story.",
+      inputSchema: z.object({
+        episode: z.string(),
+        scene_number: z.number().int().positive(),
+        title: z.string(),
+        scene_text: z.string().min(1),
+      }),
+    },
+    async ({ episode, scene_number, title, scene_text }) => {
+      const scene_id = `scene:${episode.trim()}:${scene_number}`;
 
-	server.registerTool(
-		"calculate",
-		{
-			inputSchema: z.object({
-				operation: z.enum(["add", "subtract", "multiply", "divide"]),
-				a: z.number(),
-				b: z.number(),
-			}),
-		},
-		async ({ operation, a, b }) => {
-			let result: number;
-			switch (operation) {
-				case "add":
-					result = a + b;
-					break;
-				case "subtract":
-					result = a - b;
-					break;
-				case "multiply":
-					result = a * b;
-					break;
-				case "divide":
-					if (b === 0)
-						return {
-							content: [
-								{
-									type: "text",
-									text: "Error: Cannot divide by zero",
-								},
-							],
-						};
-					result = a / b;
-					break;
-			}
-			return { content: [{ type: "text", text: String(result) }] };
-		},
-	);
+      const scene = {
+        scene_id,
+        episode,
+        scene_number,
+        title,
+        scene_text,
+        saved_at: new Date().toISOString(),
+      };
 
-	return server;
+      await env.CHRIS_STORY_STORAGE.put(
+        scene_id,
+        JSON.stringify(scene)
+      );
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Scene saved successfully. Scene ID: ${scene_id}`,
+          },
+        ],
+      };
+    }
+  );
+
+  // Retrieve a saved scene
+  server.registerTool(
+    "get_story_scene",
+    {
+      description: "Retrieve a saved story scene using its scene ID.",
+      inputSchema: z.object({
+        scene_id: z.string(),
+      }),
+    },
+    async ({ scene_id }) => {
+      const scene = await env.CHRIS_STORY_STORAGE.get(scene_id);
+
+      if (!scene) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: "Scene not found." }],
+        };
+      }
+
+      return {
+        content: [{ type: "text", text: scene }],
+      };
+    }
+  );
+
+  // List saved scenes
+  server.registerTool(
+    "list_story_scenes",
+    {
+      description: "List saved scenes from the story library.",
+    },
+    async () => {
+      const result = await env.CHRIS_STORY_STORAGE.list({
+        prefix: "scene:",
+      });
+
+      const scenes = result.keys.map((key) => key.name);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: scenes.length
+              ? scenes.join("\n")
+              : "No story scenes have been saved yet.",
+          },
+        ],
+      };
+    }
+  );
+
+  return server;
 }
 
 const handler = createMcpHandler(createServer);
 
 export default {
-	fetch(request: Request, env: Env, ctx: ExecutionContext) {
-		return handler(request, env, ctx);
-	},
+  fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    return handler(request, env, ctx);
+  },
 } satisfies ExportedHandler<Env>;
